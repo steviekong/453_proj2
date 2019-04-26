@@ -1,7 +1,7 @@
 import socket
 import select
 import argparse
-import time
+from timeit import default_timer as timer
 
 import utils
 
@@ -22,7 +22,7 @@ class ChatClientSender:
         while True:
             data = self.rdr.read()
             if data:
-                self.rdt_send('FILENAME ' + self.remote_op_file, data, 2048)
+                self.rdt_send('FILENAME ' + self.remote_op_file, data, 1983)
             else:
                 break
     
@@ -31,7 +31,13 @@ class ChatClientSender:
         offset = 0
         seq = 0
         is_first = False
+        start = timer()
         while offset < len(data):
+            end = timer()
+            print(end-start)
+            if int(end-start)  >= 200:
+                print("TIMER EXPIRED")
+                break;
             if is_first == True:
                 if offset + segment_size > len(data):
                     segment = data[offset:]
@@ -40,24 +46,39 @@ class ChatClientSender:
                 offset += segment_size
             ack = False 
             while not ack:
+                end = timer()
+                print(end-start)
+                if int(end-start)  >= 200:
+                    print("TIMER EXPIRED")
+                    break;
                 if is_first == False:
-                    print('sending ' +filename)
-                    self.sock.sendto((str(utils.checksum(filename+str(len(data))))+str(seq)+filename+str(len(data)).encode(), self.address))
+                    tosend = (filename+ ' ' + str(len(data))).encode()
+                    #self.sock.sendto((str(utils.checksum(filename+ ' ' +str(len(data))))+str(seq)+filename+' '+str(len(data))).encode(), self.address)
+                    self.sock.sendto(utils.checksum(tosend).encode()+str(seq).encode()+tosend, self.address)
+                    print("sending filename " + (utils.checksum(tosend).encode()+tosend).decode())
                 else:
-                    print(segment)
-                    self.sock.sendto(utils.checksum(segment)+str(seq)+filename, self.address)
+                    print("sending DATA")
+                    self.sock.sendto(utils.checksum(segment).encode()+str(seq).encode()+segment, self.address)
+                    print('checksum :'  + utils.checksum(segment) + 'seq: '+ str(seq) )
                 try:
                     message, self.address = self.sock.recvfrom(2048)
                 except socket.timeout:
                     print('timeout')
                 else:
-                    print(message)
-                    checksum = message[:2]
-                    ack_seq = message[5]
-                    if utils.checksum(message[2:]) == checksum and ack_seq == str(seq):
-                        ack = True 
-                        is_first = True
-        seq = 1 - seq
+                    try: 
+                        print(message)
+                        checksum = message[:64]
+                        print('checksunm is '+ checksum.decode())
+                        ack_seq = message[67:68] 
+                        print('ack is '+ str(ack_seq))  
+                        if utils.checksum(message[64:]) == checksum.decode() and ack_seq.decode() == str(seq):
+                            print('got valid ack ' + ack_seq.decode())
+                            ack = True 
+                            is_first = True
+                    except:
+                        pass
+                  
+            seq = 1 - seq
     
     def send_remote_output_filename(self):
         print('sending the file called ' + self.remote_op_file)
@@ -97,7 +118,7 @@ if __name__ == '__main__':
                 # send FILENAME
                 sender.send_byte_stream()
     finally:
-		# FIXME: close connection so receiver gracefully exits
+        # FIXME: close connection so receiver gracefully exits
         print('closing')
         sock.sendto(b'.', serv_addr)
         sock.sendto(b'QUIT', serv_addr)

@@ -4,8 +4,8 @@ import select
 
 TIMEOUT_MILLIS = 1000
 MAX_MSG_SIZE = 2048
-SENDER = 'sender_30664666'
-RECEIVER = 'receiver_30664666'
+SENDER = 'sender_sidkr'
+RECEIVER = 'receiver_sidrk'
 
 
 def to_bytearray(obj):
@@ -51,18 +51,13 @@ def setup_connection(sock, address, receiver):
 
 
 
-def checksum(data):
-    s = 0
-    n = len(data) % 2
-    for i in range(0, len(data)-n, 2):
-        s+= ord(data[i]) + (ord(data[i+1]) << 8)
-    if n:
-        s+= ord(data[i+1])
-    while (s >> 16):
-        s = (s & 0xFFFF) + (s >> 16)
-    s = ~s & 0xffff
-    return s
-
+def checksum(msg):
+   return hashlib.sha256(msg).hexdigest()
+def blastpackets(message, addr, sock):
+    i = 0 
+    while i <= 100:
+        sock.sendto(message, addr)
+        i+= 1
 
 
 if __name__ == '__main__':
